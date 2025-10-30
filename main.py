@@ -1,48 +1,27 @@
 from flask import Flask, request, jsonify
-from utils.instagram import get_instagram_media
-from utils.pinterest import get_pinterest_media
+from auth import check_auth
+from utils.instagram import download_instagram
+from utils.pinterest import download_pinterest
 
 app = Flask(__name__)
 
-@app.route('/')
+@app.route("/")
 def home():
-    return jsonify({
-        "status": "running ✅",
-        "message": "Universal Downloader API (Instagram + Pinterest)"
-    })
+    return jsonify({"status": "running ✅"})
 
-
-@app.route('/download', methods=['GET'])
+@app.route("/download")
 def download():
-    url = request.args.get('url')
+    auth_error = check_auth()
+    if auth_error:
+        return auth_error
+
+    url = request.args.get("url")
     if not url:
-        return jsonify({"error": "URL not provided"}), 400
+        return jsonify({"detail": "URL required"}), 400
 
-    # Pinterest linkmi?
-    if "pin.it" in url or "pinterest.com" in url:
-        try:
-            data = get_pinterest_media(url)
-            if data:
-                return jsonify(data)
-            else:
-                return jsonify({"error": "Pinterest media not found"}), 404
-        except Exception as e:
-            return jsonify({"error": str(e)}), 500
-
-    # Instagram uchun
-    elif "instagram.com" in url:
-        try:
-            data = get_instagram_media(url)
-            if data:
-                return jsonify(data)
-            else:
-                return jsonify({"error": "Instagram media not found"}), 404
-        except Exception as e:
-            return jsonify({"error": str(e)}), 500
-
+    if "instagram.com" in url:
+        return jsonify(download_instagram(url))
+    elif "pin.it" in url or "pinterest.com" in url:
+        return jsonify(download_pinterest(url))
     else:
-        return jsonify({"error": "Unsupported platform"}), 400
-
-
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=10000)
+        return jsonify({"detail": "Unsupported URL"}), 400
