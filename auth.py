@@ -1,7 +1,9 @@
-from fastapi import Header, HTTPException
+import os
+from flask import request, jsonify
 
-TOKEN = "ppaallaakkaatt"  # o'zing tokenni bu yerga yoz
-
-async def verify_token(x_api_key: str = Header(...)):
-    if x_api_key != TOKEN:
-        raise HTTPException(status_code=401, detail="Invalid API token")
+def check_auth():
+    api_key = os.getenv("API_KEY")
+    key = request.headers.get("Authorization")
+    if not key or key != f"Bearer {api_key}":
+        return jsonify({"detail": "Unauthorized"}), 401
+    return None
