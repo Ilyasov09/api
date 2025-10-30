@@ -1,35 +1,48 @@
-from fastapi import FastAPI, Query, Depends
-from fastapi.responses import JSONResponse
-from auth import verify_token
+from flask import Flask, request, jsonify
 from utils.instagram import get_instagram_media
 from utils.pinterest import get_pinterest_media
 
-app = FastAPI(title="insta_pin_api", version="1.0")
+app = Flask(__name__)
 
-def detect_platform(url: str) -> str:
-    u = url.lower()
-    if "instagram.com" in u:
-        return "instagram"
-    if "pin.it" in u or "pinterest.com" in u:
-        return "pinterest"
-    return "unknown"
+@app.route('/')
+def home():
+    return jsonify({
+        "status": "running ✅",
+        "message": "Universal Downloader API (Instagram + Pinterest)"
+    })
 
-@app.get("/", tags=["health"])
-async def root():
-    return {"status": "ok", "message": "insta_pin_api up"}
 
-@app.get("/download", dependencies=[Depends(verify_token)])
-async def download(url: str = Query(..., description="Instagram or Pinterest post URL")):
-    platform = detect_platform(url)
+@app.route('/download', methods=['GET'])
+def download():
+    url = request.args.get('url')
+    if not url:
+        return jsonify({"error": "URL not provided"}), 400
 
-    if platform == "instagram":
-        result = await get_instagram_media(url)
-    elif platform == "pinterest":
-        result = await get_pinterest_media(url)
+    # Pinterest linkmi?
+    if "pin.it" in url or "pinterest.com" in url:
+        try:
+            data = get_pinterest_media(url)
+            if data:
+                return jsonify(data)
+            else:
+                return jsonify({"error": "Pinterest media not found"}), 404
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    # Instagram uchun
+    elif "instagram.com" in url:
+        try:
+            data = get_instagram_media(url)
+            if data:
+                return jsonify(data)
+            else:
+                return jsonify({"error": "Instagram media not found"}), 404
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
     else:
-        return JSONResponse(status_code=400, content={"status": "error", "detail": "Unsupported platform"})
+        return jsonify({"error": "Unsupported platform"}), 400
 
-    if not result:
-        return JSONResponse(status_code=500, content={"status": "error", "detail": "No media found"})
 
-    return JSONResponse(status_code=200, content=result)
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=10000)
