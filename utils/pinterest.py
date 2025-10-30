@@ -1,28 +1,42 @@
-import httpx
-from bs4 import BeautifulSoup
-from typing import Dict
+import requests, re
 
-async def get_pinterest_media(url: str) -> Dict:
-    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+def get_pinterest_media(url):
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
+    }
+
+    # Agar short link (pin.it) bo‘lsa, redirect qilamiz
+    if "pin.it" in url:
+        try:
+            r = requests.get(url, headers=headers, allow_redirects=True)
+            url = r.url
+        except:
+            return None
 
     try:
-        async with httpx.AsyncClient(timeout=15.0, headers=headers, follow_redirects=True) as client:
-            r = await client.get(url)
-            r.raise_for_status()
-            html = r.text
-    except Exception as e:
-        return {"status": "error", "detail": f"Request failed: {str(e)}"}
+        r = requests.get(url, headers=headers)
+        html = r.text
+    except:
+        return None
 
-    soup = BeautifulSoup(html, "html.parser")
+    # 🔹 Video
+    video_match = re.search(r'"contentUrl":"(https:[^"]+mp4)"', html)
+    if video_match:
+        video_url = video_match.group(1).replace("\\u0026", "&")
+        return {
+            "status": "ok",
+            "platform": "pinterest",
+            "media": [{"type": "video", "url": video_url}]
+        }
 
-    # Video priority
-    og_video = soup.find("meta", property="og:video")
-    if og_video and og_video.get("content"):
-        return {"status": "ok", "platform": "pinterest", "media": [{"type": "video", "url": og_video["content"]}]}
+    # 🔹 Rasm
+    image_match = re.search(r'"image":"(https:[^"]+)"', html)
+    if image_match:
+        image_url = image_match.group(1).replace("\\u0026", "&")
+        return {
+            "status": "ok",
+            "platform": "pinterest",
+            "media": [{"type": "image", "url": image_url}]
+        }
 
-    # Fallback: images
-    og_image = soup.find("meta", property="og:image")
-    if og_image and og_image.get("content"):
-        return {"status": "ok", "platform": "pinterest", "media": [{"type": "image", "url": og_image["content"]}]}
-
-    return {"status": "error", "detail": "No media found or post may be private."}
+    return None
