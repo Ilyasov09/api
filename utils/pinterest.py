@@ -1,42 +1,24 @@
-import requests, re
+import requests
 
-def get_pinterest_media(url):
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
-    }
-
-    # Agar short link (pin.it) bo‘lsa, redirect qilamiz
-    if "pin.it" in url:
-        try:
-            r = requests.get(url, headers=headers, allow_redirects=True)
-            url = r.url
-        except:
-            return None
-
+def download_pinterest(url):
     try:
-        r = requests.get(url, headers=headers)
-        html = r.text
-    except:
-        return None
+        api = "https://pinterestvideodownloader.io/api/"
+        res = requests.get(api, params={"url": url})
+        data = res.json()
 
-    # 🔹 Video
-    video_match = re.search(r'"contentUrl":"(https:[^"]+mp4)"', html)
-    if video_match:
-        video_url = video_match.group(1).replace("\\u0026", "&")
-        return {
-            "status": "ok",
-            "platform": "pinterest",
-            "media": [{"type": "video", "url": video_url}]
-        }
-
-    # 🔹 Rasm
-    image_match = re.search(r'"image":"(https:[^"]+)"', html)
-    if image_match:
-        image_url = image_match.group(1).replace("\\u0026", "&")
-        return {
-            "status": "ok",
-            "platform": "pinterest",
-            "media": [{"type": "image", "url": image_url}]
-        }
-
-    return None
+        if "video" in data:
+            return {
+                "status": "ok",
+                "platform": "pinterest",
+                "media": [{"type": "video", "url": data["video"]}]
+            }
+        elif "image" in data:
+            return {
+                "status": "ok",
+                "platform": "pinterest",
+                "media": [{"type": "image", "url": data["image"]}]
+            }
+        else:
+            return {"status": "error", "detail": "No media found"}
+    except Exception as e:
+        return {"status": "error", "detail": str(e)}
