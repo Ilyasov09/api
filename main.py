@@ -1,4 +1,3 @@
-import os
 from fastapi import FastAPI, Query, Depends
 from fastapi.responses import JSONResponse
 from auth import verify_token
