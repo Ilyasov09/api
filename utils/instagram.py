@@ -1,6 +1,6 @@
 import re
 import httpx
-from typing import List, Dict
+from typing import Dict
 
 _CLEAN_REPLACEMENTS = [('\\u0026', '&'), ('\\/', '/')]
 
@@ -10,15 +10,6 @@ def _clean_url(u: str) -> str:
     return u
 
 async def get_instagram_media(url: str) -> Dict:
-    """Returns dict like:
-    {
-        "status": "ok",
-        "platform": "instagram",
-        "media": [ {"type":"image"/"video","url":"..."}, ... ]
-    }
-    Uses httpx async request and regex to extract display_url / video_url from page HTML.
-    Handles carousel posts by gathering all matches and de-duping.
-    """
     headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
 
     try:
@@ -31,29 +22,37 @@ async def get_instagram_media(url: str) -> Dict:
 
     media = []
 
-    # video_url occurrences
+    # Video priority
     video_urls = re.findall(r'"video_url":"([^"]+)"', html)
     for v in video_urls:
         media.append({"type": "video", "url": _clean_url(v)})
 
-    # display_url occurrences (images)
+    if media:
+        # deduplicate
+        unique = []
+        seen = set()
+        for m in media:
+            if m["url"] not in seen:
+                seen.add(m["url"])
+                unique.append(m)
+        return {"status": "ok", "platform": "instagram", "media": unique}
+
+    # Fallback: images
     image_urls = re.findall(r'"display_url":"([^"]+)"', html)
     for i in image_urls:
         media.append({"type": "image", "url": _clean_url(i)})
 
-    # og:image fallback
     og_images = re.findall(r'<meta property="og:image" content="([^"]+)"', html)
     for o in og_images:
         media.append({"type": "image", "url": _clean_url(o)})
 
-    # Deduplicate preserving order
+    # deduplicate images
     unique = []
     seen = set()
     for m in media:
-        if m["url"] in seen:
-            continue
-        seen.add(m["url"])
-        unique.append(m)
+        if m["url"] not in seen:
+            seen.add(m["url"])
+            unique.append(m)
 
     if not unique:
         return {"status": "error", "detail": "No media found or post may be private."}
