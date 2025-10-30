@@ -1,34 +1,20 @@
 import requests, re
 
-def get_instagram_media(url):
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
-    }
-
+def download_instagram(url):
     try:
-        r = requests.get(url, headers=headers, timeout=10)
-        html = r.text
+        api = "https://igram.world/api/ig/media"
+        res = requests.post(api, json={"url": url})
+        data = res.json()
+
+        if "data" in data and len(data["data"]) > 0:
+            media = []
+            for item in data["data"]:
+                media.append({
+                    "type": "video" if ".mp4" in item["url"] else "image",
+                    "url": item["url"]
+                })
+            return {"status": "ok", "platform": "instagram", "media": media}
+        else:
+            return {"status": "error", "detail": "No media found"}
     except Exception as e:
-        return {"error": f"Failed to fetch page: {str(e)}"}
-
-    # 🔹 Video URL
-    video_match = re.search(r'"video_url":"(https:[^"]+)"', html)
-    if video_match:
-        video_url = video_match.group(1).replace("\\u0026", "&")
-        return {
-            "status": "ok",
-            "platform": "instagram",
-            "media": [{"type": "video", "url": video_url}]
-        }
-
-    # 🔹 Rasm URL
-    image_match = re.search(r'"display_url":"(https:[^"]+)"', html)
-    if image_match:
-        image_url = image_match.group(1).replace("\\u0026", "&")
-        return {
-            "status": "ok",
-            "platform": "instagram",
-            "media": [{"type": "image", "url": image_url}]
-        }
-
-    return None
+        return {"status": "error", "detail": str(e)}
