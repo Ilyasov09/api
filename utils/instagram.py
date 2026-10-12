@@ -1,9 +1,14 @@
-import requests, re
+"""
+Instagram Media Extractor
+Resolves public Instagram post/reel URLs and returns direct media streams.
+"""
+
+import requests
 
 def download_instagram(url):
     try:
         api = "https://igram.world/api/ig/media"
-        res = requests.post(api, json={"url": url})
+        res = requests.post(api, json={"url": url}, timeout=20)
         data = res.json()
 
         if "data" in data and len(data["data"]) > 0:
@@ -15,6 +20,6 @@ def download_instagram(url):
                 })
             return {"status": "ok", "platform": "instagram", "media": media}
         else:
-            return {"status": "error", "detail": "No media found"}
+            return {"status": "error", "detail": "No media found or post is private"}
     except Exception as e:
         return {"status": "error", "detail": str(e)}
